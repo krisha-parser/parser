@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,9 +16,28 @@ func main() {
 	var args struct {
 		ProxyUrl string `arg:"--proxy-url"`
 		Format   string `arg:"--format" default:"json"`
+		RPM      int    `arg:"--rpm" default:"60"`
+		LogLevel string `arg:"--log-level" default:"info"`
 	}
 
 	arg.MustParse(&args)
+
+	var level slog.Level
+	err := level.UnmarshalText([]byte(args.LogLevel))
+
+	if err != nil {
+		panic(err)
+	}
+
+	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: level,
+	})
+
+	handlerAttrs := []slog.Attr{slog.String("type", "log")}
+	handler = handler.WithAttrs(handlerAttrs).(*slog.JSONHandler)
+	slog.SetDefault(slog.New(handler))
+
+	slog.Debug("Starting parser...")
 
 	var transport = &http.Transport{}
 
@@ -38,12 +58,21 @@ func main() {
 		Transport: transport,
 	}
 
+	rpm := args.RPM
+
 	if args.Format == "html" {
-		for item := range scraper.ScrapeHtml(client) {
-			_, _ = os.Stdout.Write([]byte(strings.ReplaceAll(item, "\n", " ") + "\n"))
+		for item, err := range scraper.ScrapeHtml(client, rpm) {
+
+			if err != nil {
+				panic(err)
+			}
+
+			_, _ = os.Stdout.Write([]byte(strings.ReplaceAll(item.Html, "\n", " ") + "\n"))
 		}
 	} else {
-		for item := range scraper.Scrape(client) {
+		slog.Debug("Scraping to JSON")
+
+		for item := range scraper.Scrape(client, rpm) {
 			jsonString, err := json.Marshal(item)
 
 			if err != nil {
