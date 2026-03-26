@@ -2,13 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"krisha-scraper/scraper"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 
 	"github.com/alexflint/go-arg"
+	"github.com/krisha-parser/parser/scraper"
 )
 
 func main() {
